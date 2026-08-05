@@ -20,29 +20,44 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Patch v0.5 user edition and proven player identity
+      - name: Patch v0.5.1 TV viewer experience and persistence
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('app/src/main/java/com/tvrepairkathmandu/trkyoutube/MainActivity.java')
-          s = p.read_text()
-          s = s.replace('private static final String VERSION="0.4.0";', 'private static final String VERSION="0.5.0";')
-          s = s.replace('immersive();\n        showWelcome();', 'immersive();\n        if(prefs.getBoolean("remember_guest",false) && apiKey().length()>0) showHome(); else showWelcome();')
-          s = s.replace('Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());', 'Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->{prefs.edit().putBoolean("remember_guest",true).apply();showHome();});')
-          s = s.replace('        Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());root.addView(setup,new LinearLayout.LayoutParams(dp(420),dp(62)));\n', '')
-          s = s.replace('        Button browser=b("WEB FALLBACK");browser.setOnClickListener(v->openWeb("https://www.youtube.com/"));root.addView(browser,new LinearLayout.LayoutParams(dp(420),dp(62)));\n', '')
-          s = s.replace('TextView h=t("Connect YouTube Data",22);', 'TextView h=t("YouTube service setup required",22);')
-          s = s.replace('box.addView(t("Native Home and Search need a YouTube Data API key. Add it once in YouTube Setup. The key stays on this device.",16));', 'box.addView(t("This device has not been configured yet. Open Technician Setup in Settings to connect native Home and Search.",16));')
-          s = s.replace('Button setup=b("OPEN YOUTUBE SETUP");', 'Button setup=b("OPEN TECHNICIAN SETUP");')
-          s = s.replace('Button web=b("WEB FALLBACK");web.setOnClickListener(v->openWeb("https://www.youtube.com/"));target.addView(web,new LinearLayout.LayoutParams(-1,dp(58)));', '')
-          s = s.replace('Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));', 'Button setup=b("TECHNICIAN SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));')
-          s = s.replace('TextView h=t("YouTube Setup",30);', 'TextView h=t("Technician Setup",30);')
-          s = s.replace('r.addView(t("For native Home/Search, paste a YouTube Data API v3 key. For real Google TV sign-in later, paste a TV/Limited Input OAuth client ID. These values are stored only in this app\'s private settings on the device.",16));', 'r.addView(t("Developer settings for YouTube Data API, region and future TV sign-in. Normal viewers should not need this screen after setup.",16));')
-          s = s.replace("<head><meta name='viewport'", "<head><meta name='referrer' content='strict-origin-when-cross-origin'><meta name='viewport'")
-          s = s.replace("origin=https%3A%2F%2Fwww.youtube.com'", "origin=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube&widget_referrer=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube'")
-          s = s.replace('web.loadDataWithBaseURL("https://www.youtube.com/",html', 'web.loadDataWithBaseURL("https://com.tvrepairkathmandu.trkyoutube/",html')
+          p=Path('app/src/main/java/com/tvrepairkathmandu/trkyoutube/MainActivity.java')
+          s=p.read_text()
+          s=s.replace('private static final String VERSION="0.4.0";', 'private static final String VERSION="0.5.1";')
+          # Preserve proven player identity fix.
+          s=s.replace("<head><meta name='viewport'", "<head><meta name='referrer' content='strict-origin-when-cross-origin'><meta name='viewport'")
+          s=s.replace("origin=https%3A%2F%2Fwww.youtube.com'", "origin=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube&widget_referrer=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube'")
+          s=s.replace('web.loadDataWithBaseURL("https://www.youtube.com/",html', 'web.loadDataWithBaseURL("https://com.tvrepairkathmandu.trkyoutube/",html')
+          # Viewer-facing branding: familiar video client; TRK stays in settings/about.
+          s=s.replace('t("▶ TRK",24)', 't("▶ YouTube",24)')
+          s=s.replace('t("TRK YouTube TV",34)', 't("YouTube",34)')
+          s=s.replace('t("Native TV experience for old & new Android TVs",18)', 't("Watch videos on your TV",18)')
+          # Remember guest and launch directly when configured.
+          s=s.replace('immersive();\n        showWelcome();', 'immersive();\n        if(apiKey().length()>0) { prefs.edit().putBoolean("remember_guest",true).apply(); showHome(); } else showWelcome();')
+          s=s.replace('Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());', 'Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->{prefs.edit().putBoolean("remember_guest",true).apply();showHome();});')
+          # Remove developer/fallback controls from welcome.
+          s=s.replace('        Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());root.addView(setup,new LinearLayout.LayoutParams(dp(420),dp(62)));\n','')
+          s=s.replace('        Button browser=b("WEB FALLBACK");browser.setOnClickListener(v->openWeb("https://www.youtube.com/"));root.addView(browser,new LinearLayout.LayoutParams(dp(420),dp(62)));\n','')
+          # Keep setup only in Settings and label TRK there.
+          s=s.replace('Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));', 'Button setup=b("TRK TECHNICIAN SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));')
+          s=s.replace('TextView h=t("YouTube Setup",30);', 'TextView h=t("TRK Technician Setup",30);')
+          # No web fallback on missing key home card; direct to technician setup.
+          s=s.replace('TextView h=t("Connect YouTube Data",22);','TextView h=t("YouTube setup required",22);')
+          s=s.replace('Button setup=b("OPEN YOUTUBE SETUP");','Button setup=b("OPEN TRK TECHNICIAN SETUP");')
+          s=s.replace('Button web=b("WEB FALLBACK");web.setOnClickListener(v->openWeb("https://www.youtube.com/"));target.addView(web,new LinearLayout.LayoutParams(-1,dp(58)));','')
+          # Add private backup of API key and restore path using filesDir.
+          old='private String apiKey(){return prefs.getString("yt_api_key","").trim();}'
+          new='''private String apiKey(){\n        String k=prefs.getString("yt_api_key","").trim();\n        if(k.length()>0){backupApiKey(k);return k;}\n        try{java.io.File f=new java.io.File(getFilesDir(),".ytcfg");if(f.exists()){java.io.BufferedReader br=new java.io.BufferedReader(new java.io.FileReader(f));String x=br.readLine();br.close();if(x!=null&&x.trim().length()>0){k=x.trim();prefs.edit().putString("yt_api_key",k).apply();}}}catch(Exception ignored){}\n        return k;\n    }\n    private void backupApiKey(String k){try{if(k==null||k.trim().length()==0)return;java.io.FileWriter w=new java.io.FileWriter(new java.io.File(getFilesDir(),".ytcfg"),false);w.write(k.trim());w.close();}catch(Exception ignored){}}'''
+          s=s.replace(old,new)
+          # Ensure save path also writes backup.
+          s=s.replace('prefs.edit().putString("yt_api_key",key.getText().toString().trim())', 'prefs.edit().putString("yt_api_key",key.getText().toString().trim())')
+          marker='.apply();showHome();'
+          s=s.replace(marker, '.apply();backupApiKey(key.getText().toString().trim());showHome();', 1) if 'key.getText()' in s else s
           p.write_text(s)
-          print('Patched v0.5 user flow and preserved working player identity')
+          print('v0.5.1 TV viewer/persistence patch applied; player fix preserved')
           PY
       - name: Build debug APK
         run: gradle --no-daemon clean assembleDebug
@@ -54,6 +69,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRK_YouTube_TV_v0.5.0_USER_EDITION_APK
+          name: TRK_YouTube_TV_v0.5.1_TV_LAYOUT_PERSISTENCE_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
