@@ -24,8 +24,8 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Apply v0.5.1 source patch
-        run: python3 tools/patch_v051.py
+      - name: Apply v0.6 professional TV UI patch
+        run: python3 tools/patch_v060.py
 
       - name: Restore stable development signing key
         run: base64 -d .github/trk-dev.jks.b64 > trk-dev.jks
@@ -64,12 +64,12 @@ jobs:
       - name: Prepare deliverable
         run: |
           mkdir -p deliverable
-          cp app/build/outputs/apk/debug/app-debug.apk deliverable/TRK_YouTube_TV_v0.5.1.apk
+          cp app/build/outputs/apk/debug/app-debug.apk deliverable/TRK_YouTube_TV_v0.6.0_PRO_TV_UI.apk
           cp app/build/outputs/apk/debug/SHA256.txt deliverable/SHA256.txt
 
       - name: Upload verified APK
         uses: actions/upload-artifact@v4
         with:
-          name: TRK_YouTube_TV_v0.5.1_VERIFIED
+          name: TRK_YouTube_TV_v0.6.0_PRO_TV_UI_VERIFIED
           path: deliverable/
           if-no-files-found: error
