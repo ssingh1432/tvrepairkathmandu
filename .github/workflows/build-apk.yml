@@ -20,44 +20,77 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Patch v0.5.1 TV viewer experience and persistence
+      - name: Patch v0.5.1 TV layout and API persistence safely
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app/src/main/java/com/tvrepairkathmandu/trkyoutube/MainActivity.java')
           s=p.read_text()
+
+          # Version and proven player fix.
           s=s.replace('private static final String VERSION="0.4.0";', 'private static final String VERSION="0.5.1";')
-          # Preserve proven player identity fix.
           s=s.replace("<head><meta name='viewport'", "<head><meta name='referrer' content='strict-origin-when-cross-origin'><meta name='viewport'")
           s=s.replace("origin=https%3A%2F%2Fwww.youtube.com'", "origin=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube&widget_referrer=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube'")
           s=s.replace('web.loadDataWithBaseURL("https://www.youtube.com/",html', 'web.loadDataWithBaseURL("https://com.tvrepairkathmandu.trkyoutube/",html')
-          # Viewer-facing branding: familiar video client; TRK stays in settings/about.
-          s=s.replace('t("▶ TRK",24)', 't("▶ YouTube",24)')
-          s=s.replace('t("TRK YouTube TV",34)', 't("YouTube",34)')
-          s=s.replace('t("Native TV experience for old & new Android TVs",18)', 't("Watch videos on your TV",18)')
-          # Remember guest and launch directly when configured.
-          s=s.replace('immersive();\n        showWelcome();', 'immersive();\n        if(apiKey().length()>0) { prefs.edit().putBoolean("remember_guest",true).apply(); showHome(); } else showWelcome();')
-          s=s.replace('Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());', 'Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->{prefs.edit().putBoolean("remember_guest",true).apply();showHome();});')
-          # Remove developer/fallback controls from welcome.
+
+          # Launch directly to Home when already configured.
+          s=s.replace('immersive();\n        showWelcome();', 'immersive();\n        if(apiKey().length()>0) showHome(); else showWelcome();')
+
+          # Viewer-facing UI: familiar TV video client; TRK stays secondary.
+          s=s.replace('TextView logo=t("▶  TRK YouTube TV",sw()<700?28:34);', 'TextView logo=t("▶  YouTube",sw()<700?28:34);')
+          s=s.replace('root.addView(t("Native TV experience for old & new Android TVs",18));', 'root.addView(t("Watch videos on your TV",18));')
+          s=s.replace('TextView logo=t("▶ TRK",22);', 'TextView logo=t("▶ YouTube",22);')
+          s=s.replace('Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());', 'Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());')
+
+          # Remove developer/fallback controls from welcome only.
           s=s.replace('        Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());root.addView(setup,new LinearLayout.LayoutParams(dp(420),dp(62)));\n','')
           s=s.replace('        Button browser=b("WEB FALLBACK");browser.setOnClickListener(v->openWeb("https://www.youtube.com/"));root.addView(browser,new LinearLayout.LayoutParams(dp(420),dp(62)));\n','')
-          # Keep setup only in Settings and label TRK there.
-          s=s.replace('Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));', 'Button setup=b("TRK TECHNICIAN SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));')
+
+          # Missing configuration screen stays simple and does not expose web fallback.
+          s=s.replace('TextView h=t("Connect YouTube Data",22);', 'TextView h=t("YouTube setup required",22);')
+          s=s.replace('box.addView(t("Native Home and Search need a YouTube Data API key. Add it once in YouTube Setup. The key stays on this device.",16));', 'box.addView(t("This TV needs one-time service configuration. Open TRK Technician Setup, save the key once, then normal viewing opens directly to Home.",16));')
+          s=s.replace('Button setup=b("OPEN YOUTUBE SETUP");', 'Button setup=b("OPEN TRK TECHNICIAN SETUP");')
+          s=s.replace('        Button fallback=b("USE WEB FALLBACK");fallback.setOnClickListener(v->openWeb("https://www.youtube.com/"));box.addView(fallback,new LinearLayout.LayoutParams(-1,dp(58)));\n','')
+
+          # Technician naming in settings/setup.
           s=s.replace('TextView h=t("YouTube Setup",30);', 'TextView h=t("TRK Technician Setup",30);')
-          # No web fallback on missing key home card; direct to technician setup.
-          s=s.replace('TextView h=t("Connect YouTube Data",22);','TextView h=t("YouTube setup required",22);')
-          s=s.replace('Button setup=b("OPEN YOUTUBE SETUP");','Button setup=b("OPEN TRK TECHNICIAN SETUP");')
-          s=s.replace('Button web=b("WEB FALLBACK");web.setOnClickListener(v->openWeb("https://www.youtube.com/"));target.addView(web,new LinearLayout.LayoutParams(-1,dp(58)));','')
-          # Add private backup of API key and restore path using filesDir.
-          old='private String apiKey(){return prefs.getString("yt_api_key","").trim();}'
-          new='''private String apiKey(){\n        String k=prefs.getString("yt_api_key","").trim();\n        if(k.length()>0){backupApiKey(k);return k;}\n        try{java.io.File f=new java.io.File(getFilesDir(),".ytcfg");if(f.exists()){java.io.BufferedReader br=new java.io.BufferedReader(new java.io.FileReader(f));String x=br.readLine();br.close();if(x!=null&&x.trim().length()>0){k=x.trim();prefs.edit().putString("yt_api_key",k).apply();}}}catch(Exception ignored){}\n        return k;\n    }\n    private void backupApiKey(String k){try{if(k==null||k.trim().length()==0)return;java.io.FileWriter w=new java.io.FileWriter(new java.io.File(getFilesDir(),".ytcfg"),false);w.write(k.trim());w.close();}catch(Exception ignored){}}'''
+          s=s.replace('Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));', 'Button setup=b("TRK TECHNICIAN SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));')
+
+          # Correct API persistence uses the actual preference name: api_key.
+          old='private String apiKey(){return prefs.getString("api_key","").trim();}'
+          new='''private String apiKey(){
+        String k=prefs.getString("api_key","").trim();
+        if(k.length()>0){backupApiKey(k);return k;}
+        try{
+            java.io.File f=new java.io.File(getFilesDir(),".trk_yt_key");
+            if(f.exists()){
+                java.io.BufferedReader br=new java.io.BufferedReader(new java.io.FileReader(f));
+                String x=br.readLine(); br.close();
+                if(x!=null && x.trim().length()>0){k=x.trim();prefs.edit().putString("api_key",k).apply();}
+            }
+        }catch(Exception ignored){}
+        return k;
+    }
+    private void backupApiKey(String k){
+        try{
+            if(k==null||k.trim().length()==0)return;
+            java.io.FileWriter w=new java.io.FileWriter(new java.io.File(getFilesDir(),".trk_yt_key"),false);
+            w.write(k.trim()); w.close();
+        }catch(Exception ignored){}
+    }'''
+          if old not in s:
+              raise SystemExit('Expected apiKey() method not found; refusing unsafe patch')
           s=s.replace(old,new)
-          # Ensure save path also writes backup.
-          s=s.replace('prefs.edit().putString("yt_api_key",key.getText().toString().trim())', 'prefs.edit().putString("yt_api_key",key.getText().toString().trim())')
-          marker='.apply();showHome();'
-          s=s.replace(marker, '.apply();backupApiKey(key.getText().toString().trim());showHome();', 1) if 'key.getText()' in s else s
+
+          # Add backup ONLY to the actual Save button callback.
+          oldsave='prefs.edit().putString("api_key",key.getText().toString().trim()).putString("oauth_client_id",client.getText().toString().trim()).putString("region",reg.getText().toString().trim().toUpperCase(Locale.US)).apply();showHome();'
+          newsave='prefs.edit().putString("api_key",key.getText().toString().trim()).putString("oauth_client_id",client.getText().toString().trim()).putString("region",reg.getText().toString().trim().toUpperCase(Locale.US)).apply();backupApiKey(key.getText().toString().trim());showHome();'
+          if oldsave not in s:
+              raise SystemExit('Expected setup Save callback not found; refusing unsafe patch')
+          s=s.replace(oldsave,newsave)
+
           p.write_text(s)
-          print('v0.5.1 TV viewer/persistence patch applied; player fix preserved')
+          print('Safe v0.5.1 patch applied: persistence + TV UI; proven player preserved')
           PY
       - name: Build debug APK
         run: gradle --no-daemon clean assembleDebug
@@ -69,6 +102,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRK_YouTube_TV_v0.5.1_TV_LAYOUT_PERSISTENCE_APK
+          name: TRK_YouTube_TV_v0.5.1_TV_LAYOUT_PERSISTENCE_FIX_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
