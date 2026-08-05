@@ -1,116 +1,39 @@
 package com.tvrepairkathmandu.trkyoutube;
 
 import android.app.Activity;
-import android.os.Bundle;
-import android.os.Build;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.net.Uri;
-import android.content.Context;
-import android.content.SharedPreferences;
-import android.view.KeyEvent;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.Gravity;
-import android.webkit.CookieManager;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
-import android.widget.Toast;
-import java.util.Locale;
-import java.util.ArrayList;
-import java.util.List;
+import android.os.*;
+import android.graphics.*;
+import android.graphics.drawable.GradientDrawable;
+import android.net.*;
+import android.content.*;
+import android.view.*;
+import android.webkit.*;
+import android.widget.*;
+import java.util.*;
+import com.google.zxing.*;
+import com.google.zxing.common.BitMatrix;
 
 public class MainActivity extends Activity {
-    private static final String VERSION="0.2";
-    private static final String PREFS="trk_youtube";
-    private LinearLayout root;
-    private WebView webView;
-    private EditText input;
-    private TextView status;
-    private boolean webOpen=false, diagnosticsOpen=false;
-    private SharedPreferences prefs;
-    private String currentVideoId="";
-
-    @Override public void onCreate(Bundle b){
-        super.onCreate(b); prefs=getSharedPreferences(PREFS,MODE_PRIVATE);
-        immersive(); showHome();
-    }
-    private void immersive(){ getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY); }
-    private TextView text(String s,int size){ TextView v=new TextView(this);v.setText(s);v.setTextColor(Color.WHITE);v.setTextSize(size);v.setPadding(18,10,18,10);return v; }
-    private Button button(String s){ Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setTextSize(17);b.setBackgroundResource(R.drawable.focus_bg);b.setFocusable(true);b.setAllCaps(false);b.setPadding(18,8,18,8);return b; }
-    private void addButton(LinearLayout box,String label,View.OnClickListener l){ Button b=button(label);b.setOnClickListener(l);box.addView(b,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,64)); }
-    private LinearLayout page(){ ScrollView sc=new ScrollView(this);LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(34,20,34,30);box.setBackgroundColor(Color.rgb(15,15,15));sc.addView(box);setContentView(sc);root=box;return box; }
-    private void heading(LinearLayout box,String subtitle){ TextView h=text("TRK YouTube TV",29);h.setTypeface(Typeface.DEFAULT,Typeface.BOLD);box.addView(h);box.addView(text(subtitle,15)); }
-
-    private void showHome(){
-        destroyWeb(); webOpen=false;diagnosticsOpen=false;LinearLayout box=page();heading(box,"Android 4.4+ universal TV build  •  v"+VERSION);
-        TextView welcome=text("YouTube for old & new Android TVs",20);welcome.setTypeface(Typeface.DEFAULT,Typeface.BOLD);box.addView(welcome);
-        input=new EditText(this);input.setHint("Search YouTube or paste video URL / ID");input.setTextColor(Color.WHITE);input.setHintTextColor(Color.LTGRAY);input.setSingleLine(true);input.setTextSize(17);input.setFocusable(true);box.addView(input,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,62));
-        addButton(box,"🔎  SEARCH YOUTUBE",v->search());
-        addButton(box,"▶  PLAY URL / VIDEO ID",v->playInput());
-        addButton(box,"🏠  YOUTUBE HOME",v->openYouTube("https://www.youtube.com/"));
-        addButton(box,"🔥  EXPLORE / TRENDING",v->openYouTube("https://www.youtube.com/feed/trending"));
-        addButton(box,"📺  SUBSCRIPTIONS",v->openYouTube("https://www.youtube.com/feed/subscriptions"));
-        addButton(box,"📚  YOUTUBE LIBRARY",v->openYouTube("https://www.youtube.com/feed/you"));
-        addButton(box,"🕘  TRK WATCH HISTORY",v->showHistory());
-        addButton(box,"⭐  TRK FAVORITES",v->showFavorites());
-        addButton(box,"⚙  SETTINGS",v->showSettings());
-        addButton(box,"🛠  DEVICE DIAGNOSTICS",v->showDiagnostics());
-        status=text("Ready • D-pad + OK • BACK returns to TRK home",14);box.addView(status);
-        if(box.getChildCount()>3)box.getChildAt(3).requestFocus();
-    }
-
-    private void search(){ String q=input==null?"":input.getText().toString().trim();if(q.length()==0){Toast.makeText(this,"Type something to search",Toast.LENGTH_SHORT).show();return;}String id=extractId(q);if(id!=null){openPlayer(id);return;}prefs.edit().putString("last_search",q).apply();openYouTube("https://www.youtube.com/results?search_query="+Uri.encode(q)); }
-    private void playInput(){ String s=input==null?"":input.getText().toString().trim();String id=extractId(s);if(id==null){Toast.makeText(this,"Paste a YouTube URL or 11-character video ID",Toast.LENGTH_LONG).show();return;}openPlayer(id); }
-    private String extractId(String s){ if(s==null)return null;if(s.matches("[A-Za-z0-9_-]{11}"))return s;String[] marks={"youtu.be/","v=","/embed/","/shorts/","/live/"};for(String m:marks){int p=s.indexOf(m);if(p>=0){String x=s.substring(p+m.length());for(char c:new char[]{'&','?','#','/'}){int e=x.indexOf(c);if(e>=0)x=x.substring(0,e);}if(x.matches("[A-Za-z0-9_-]{11}"))return x;}}return null; }
-
-    private void setupWeb(){
-        destroyWeb();webView=new WebView(this);WebSettings w=webView.getSettings();w.setJavaScriptEnabled(true);w.setDomStorageEnabled(true);w.setDatabaseEnabled(true);w.setMediaPlaybackRequiresUserGesture(false);w.setLoadWithOverviewMode(true);w.setUseWideViewPort(true);w.setBuiltInZoomControls(false);w.setDisplayZoomControls(false);w.setSupportZoom(false);w.setJavaScriptCanOpenWindowsAutomatically(true);
-        if(Build.VERSION.SDK_INT>=21){CookieManager.getInstance().setAcceptThirdPartyCookies(webView,true);w.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);}
-        String ua=prefs.getBoolean("desktop_mode",false)?"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36":"Mozilla/5.0 (Linux; Android "+Build.VERSION.RELEASE+"; "+Build.MODEL+") AppleWebKit/537.36 Mobile Safari/537.36";w.setUserAgentString(ua);
-        webView.setBackgroundColor(Color.BLACK);webView.setWebChromeClient(new WebChromeClient());webView.setWebViewClient(new WebViewClient(){
-            @Override public boolean shouldOverrideUrlLoading(WebView view,String url){return handleUrl(view,url);}
-            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest req){return handleUrl(view,req.getUrl().toString());}
-        });
-    }
-    private boolean handleUrl(WebView view,String url){ String id=extractId(url);if(id!=null&&(url.contains("watch")||url.contains("youtu.be")||url.contains("shorts")||url.contains("live"))){openPlayer(id);return true;}return false; }
-    private void openYouTube(String url){webOpen=true;diagnosticsOpen=false;setupWeb();LinearLayout frame=new LinearLayout(this);frame.setOrientation(LinearLayout.VERTICAL);frame.setBackgroundColor(Color.BLACK);LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);Button home=button("⌂ TRK");home.setOnClickListener(v->showHome());bar.addView(home,new LinearLayout.LayoutParams(120,54));Button back=button("←");back.setOnClickListener(v->{if(webView!=null&&webView.canGoBack())webView.goBack();else showHome();});bar.addView(back,new LinearLayout.LayoutParams(80,54));TextView t=text("YouTube",17);bar.addView(t,new LinearLayout.LayoutParams(0,54,1));frame.addView(bar);frame.addView(webView,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));setContentView(frame);webView.loadUrl(url);webView.requestFocus(); }
-
-    private void openPlayer(String id){
-        currentVideoId=id;addDelimited("history",id);webOpen=true;diagnosticsOpen=false;setupWeb();LinearLayout frame=new LinearLayout(this);frame.setOrientation(LinearLayout.VERTICAL);frame.setBackgroundColor(Color.BLACK);
-        LinearLayout bar=new LinearLayout(this);Button home=button("⌂ HOME");home.setOnClickListener(v->showHome());bar.addView(home,new LinearLayout.LayoutParams(130,54));Button fav=button(isIn("favorites",id)?"★ SAVED":"☆ FAVORITE");fav.setOnClickListener(v->{toggleDelimited("favorites",id);((Button)v).setText(isIn("favorites",id)?"★ SAVED":"☆ FAVORITE");});bar.addView(fav,new LinearLayout.LayoutParams(170,54));TextView tip=text("OK/Play: YouTube controls  •  BACK: previous",14);bar.addView(tip,new LinearLayout.LayoutParams(0,54,1));frame.addView(bar);frame.addView(webView,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1));setContentView(frame);
-        String html="<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body,#p{width:100%;height:100%;margin:0;background:#000;overflow:hidden}</style></head><body><iframe id='p' src='https://www.youtube.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=https%3A%2F%2Fwww.youtube.com' frameborder='0' allow='autoplay;encrypted-media;picture-in-picture;fullscreen' allowfullscreen></iframe></body></html>";
-        webView.loadDataWithBaseURL("https://www.youtube.com/",html,"text/html","UTF-8",null);webView.requestFocus();
-    }
-
-    private void showHistory(){ showIdList("TRK WATCH HISTORY","history",false); }
-    private void showFavorites(){ showIdList("TRK FAVORITES","favorites",true); }
-    private void showIdList(String title,String key,boolean removable){ destroyWeb();webOpen=false;LinearLayout box=page();heading(box,title);List<String> ids=getDelimited(key);if(ids.size()==0)box.addView(text("Nothing here yet. Videos you play/save will appear here.",17));for(String id:ids){Button b=button("▶  "+id);b.setOnClickListener(v->openPlayer(id));box.addView(b,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,62));}if(ids.size()>0){addButton(box,"🗑  CLEAR "+title,v->{prefs.edit().remove(key).apply();showIdList(title,key,removable);});}addButton(box,"← BACK",v->showHome()); }
-    private List<String> getDelimited(String key){String s=prefs.getString(key,"");List<String> out=new ArrayList<>();if(s.length()>0)for(String x:s.split(","))if(x.length()>0)out.add(x);return out;}
-    private boolean isIn(String key,String id){return getDelimited(key).contains(id);}
-    private void addDelimited(String key,String id){List<String> l=getDelimited(key);l.remove(id);l.add(0,id);while(l.size()>30)l.remove(l.size()-1);prefs.edit().putString(key,join(l)).apply();}
-    private void toggleDelimited(String key,String id){List<String> l=getDelimited(key);if(l.contains(id))l.remove(id);else l.add(0,id);prefs.edit().putString(key,join(l)).apply();}
-    private String join(List<String> l){StringBuilder b=new StringBuilder();for(String x:l){if(b.length()>0)b.append(',');b.append(x);}return b.toString();}
-
-    private void showSettings(){destroyWeb();webOpen=false;LinearLayout box=page();heading(box,"SETTINGS");boolean desk=prefs.getBoolean("desktop_mode",false);addButton(box,(desk?"✓ ":"")+"Desktop Web Compatibility Mode",v->{prefs.edit().putBoolean("desktop_mode",!prefs.getBoolean("desktop_mode",false)).apply();showSettings();});addButton(box,"Clear YouTube cookies",v->{CookieManager.getInstance().removeAllCookie();CookieManager.getInstance().removeSessionCookie();Toast.makeText(this,"Cookies cleared",Toast.LENGTH_SHORT).show();});addButton(box,"Clear TRK history",v->{prefs.edit().remove("history").apply();Toast.makeText(this,"History cleared",Toast.LENGTH_SHORT).show();});addButton(box,"About TRK YouTube TV",v->Toast.makeText(this,"TRK YouTube TV v"+VERSION+" • Android API 19+",Toast.LENGTH_LONG).show());addButton(box,"← BACK",v->showHome()); }
-
-    private void showDiagnostics(){
-        destroyWeb();webOpen=false;diagnosticsOpen=true;LinearLayout box=page();heading(box,"DEVICE DIAGNOSTICS");String abi=Build.VERSION.SDK_INT>=21?Build.SUPPORTED_ABIS[0]:Build.CPU_ABI;String web="System/legacy WebView";if(Build.VERSION.SDK_INT>=26){try{android.content.pm.PackageInfo p=WebView.getCurrentWebViewPackage();if(p!=null)web=p.packageName+" "+p.versionName;}catch(Throwable ignored){}}
-        ConnectivityManager cm=(ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);NetworkInfo ni=cm==null?null:cm.getActiveNetworkInfo();String d=String.format(Locale.US,"Android: %s\nSDK/API: %d\nManufacturer: %s\nModel: %s\nBoard: %s\nCPU ABI: %s\nWebView: %s\nNetwork: %s\nDesktop mode: %s\n\nPackage: com.tvrepairkathmandu.trkyoutube\nApp version: %s\nMinimum API: 19 (Android 4.4)\n\nREMOTE TEST\nPress remote keys. Last key appears below.",Build.VERSION.RELEASE,Build.VERSION.SDK_INT,Build.MANUFACTURER,Build.MODEL,Build.BOARD,abi,web,(ni!=null&&ni.isConnected())?"CONNECTED":"DISCONNECTED",prefs.getBoolean("desktop_mode",false)?"ON":"OFF",VERSION);box.addView(text(d,17));status=text("Last key: none",19);box.addView(status);addButton(box,"TEST YOUTUBE CONNECTION",v->openYouTube("https://www.youtube.com/"));addButton(box,"← BACK",v->showHome());
-    }
-
-    private void destroyWeb(){if(webView!=null){try{webView.stopLoading();webView.loadUrl("about:blank");webView.clearHistory();webView.removeAllViews();webView.destroy();}catch(Throwable ignored){}webView=null;}}
-    @Override public boolean dispatchKeyEvent(KeyEvent e){if(e.getAction()==KeyEvent.ACTION_DOWN&&diagnosticsOpen&&status!=null)status.setText("Last key: "+KeyEvent.keyCodeToString(e.getKeyCode())+" ("+e.getKeyCode()+")");return super.dispatchKeyEvent(e);}
-    @Override public void onBackPressed(){if(webOpen&&webView!=null&&webView.canGoBack()){webView.goBack();return;}showHome();}
-    @Override protected void onDestroy(){destroyWeb();super.onDestroy();}
+ private static final String VERSION="0.3"; private SharedPreferences prefs; private WebView web; private EditText search; private LinearLayout content; private TextView title;
+ @Override public void onCreate(Bundle b){super.onCreate(b);prefs=getSharedPreferences("trk_youtube",0);immersive();showWelcome();}
+ private void immersive(){getWindow().getDecorView().setSystemUiVisibility(5894);}
+ private TextView t(String s,int z){TextView v=new TextView(this);v.setText(s);v.setTextColor(Color.WHITE);v.setTextSize(z);v.setPadding(14,9,14,9);return v;}
+ private GradientDrawable bg(int c,int r){GradientDrawable g=new GradientDrawable();g.setColor(c);g.setCornerRadius(r);return g;}
+ private Button b(String s){Button v=new Button(this);v.setText(s);v.setTextColor(Color.WHITE);v.setTextSize(16);v.setAllCaps(false);v.setFocusable(true);v.setBackgroundResource(R.drawable.focus_bg);return v;}
+ private void showWelcome(){destroyWeb(); LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setGravity(Gravity.CENTER);root.setPadding(70,40,70,40);root.setBackgroundColor(Color.rgb(12,12,12));TextView logo=t("▶  TRK YouTube TV",34);logo.setTypeface(null,1);root.addView(logo);root.addView(t("Watch YouTube on old & new Android TVs",19));root.addView(t("v"+VERSION+"  •  Android 4.4+",14));Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->{prefs.edit().putBoolean("guest",true).apply();showHome();});root.addView(guest,new LinearLayout.LayoutParams(420,68));Button signin=b("SIGN IN WITH PHONE");signin.setOnClickListener(v->showSignIn());root.addView(signin,new LinearLayout.LayoutParams(420,68));Button browser=b("USE YOUTUBE IN BROWSER");browser.setOnClickListener(v->openWeb("https://www.youtube.com/"));root.addView(browser,new LinearLayout.LayoutParams(420,68));setContentView(root);guest.requestFocus();}
+ private void showHome(){destroyWeb(); LinearLayout shell=new LinearLayout(this);shell.setOrientation(LinearLayout.HORIZONTAL);shell.setPadding(22,18,22,18);shell.setBackgroundColor(Color.rgb(10,10,10));LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.VERTICAL);nav.setPadding(4,8,12,8);TextView logo=t("▶ TRK",23);logo.setTypeface(null,1);nav.addView(logo);addNav(nav,"⌂  Home",v->showHome());addNav(nav,"⌕  Search",v->{search.requestFocus();});addNav(nav,"🔥  Explore",v->openWeb("https://www.youtube.com/feed/trending"));addNav(nav,"▣  Subscriptions",v->openWeb("https://www.youtube.com/feed/subscriptions"));addNav(nav,"◷  History",v->openWeb("https://www.youtube.com/feed/history"));addNav(nav,"★  Favorites",v->showLocal());addNav(nav,"☺  Account",v->showAccount());addNav(nav,"⚙  Settings",v->showSettings());shell.addView(nav,new LinearLayout.LayoutParams(235,-1));ScrollView sc=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(24,4,10,30);sc.addView(content);shell.addView(sc,new LinearLayout.LayoutParams(0,-1,1));LinearLayout top=new LinearLayout(this);search=new EditText(this);search.setSingleLine();search.setHint("Search YouTube");search.setHintTextColor(Color.LTGRAY);search.setTextColor(Color.WHITE);search.setTextSize(18);search.setBackground(bg(Color.rgb(38,38,38),28));search.setOnEditorActionListener((v,a,e)->{doSearch();return true;});top.addView(search,new LinearLayout.LayoutParams(0,58,1));Button go=b("SEARCH");go.setOnClickListener(v->doSearch());top.addView(go,new LinearLayout.LayoutParams(130,58));content.addView(top);title=t("Recommended for you",26);title.setTypeface(null,1);content.addView(title);addRow("Start watching",new String[]{"Search videos","Trending now","Music","News","Live"},new String[]{"search","https://www.youtube.com/feed/trending","https://www.youtube.com/results?search_query=music","https://www.youtube.com/results?search_query=news","https://www.youtube.com/results?search_query=live"});addRow("Explore",new String[]{"Movies & TV","Gaming","Sports","Learning","Podcasts"},new String[]{"https://www.youtube.com/results?search_query=movies","https://www.youtube.com/gaming","https://www.youtube.com/results?search_query=sports","https://www.youtube.com/results?search_query=learning","https://www.youtube.com/podcasts"});addRow("Your TRK library",new String[]{"Watch history","Favorites","Subscriptions","YouTube library"},new String[]{"https://www.youtube.com/feed/history","local","https://www.youtube.com/feed/subscriptions","https://www.youtube.com/feed/you"});setContentView(shell);nav.getChildAt(1).requestFocus();}
+ private void addNav(LinearLayout n,String s,View.OnClickListener l){Button x=b(s);x.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);x.setOnClickListener(l);n.addView(x,new LinearLayout.LayoutParams(-1,58));}
+ private void addRow(String h,String[] names,String[] urls){TextView x=t(h,21);x.setTypeface(null,1);content.addView(x);HorizontalScrollView hs=new HorizontalScrollView(this);LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);for(int i=0;i<names.length;i++){final String u=urls[i];LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(8,8,8,8);TextView art=t("▶",38);art.setGravity(Gravity.CENTER);art.setBackground(bg(Color.rgb(35,35,35),16));card.addView(art,new LinearLayout.LayoutParams(245,125));Button name=b(names[i]);name.setOnClickListener(v->{if("search".equals(u))search.requestFocus();else if("local".equals(u))showLocal();else openWeb(u);});card.addView(name,new LinearLayout.LayoutParams(245,58));row.addView(card);}hs.addView(row);content.addView(hs,new LinearLayout.LayoutParams(-1,205));}
+ private void doSearch(){String q=search.getText().toString().trim();if(q.length()>0)openWeb("https://www.youtube.com/results?search_query="+Uri.encode(q));}
+ private void setupWeb(){destroyWeb();web=new WebView(this);WebSettings s=web.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setDatabaseEnabled(true);s.setMediaPlaybackRequiresUserGesture(false);s.setLoadWithOverviewMode(true);s.setUseWideViewPort(true);if(Build.VERSION.SDK_INT>=21)CookieManager.getInstance().setAcceptThirdPartyCookies(web,true);web.setWebChromeClient(new WebChromeClient());web.setWebViewClient(new WebViewClient());}
+ private void openWeb(String url){setupWeb();LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);r.setBackgroundColor(Color.BLACK);LinearLayout bar=new LinearLayout(this);Button home=b("⌂ TRK HOME");home.setOnClickListener(v->showHome());bar.addView(home,new LinearLayout.LayoutParams(170,54));Button back=b("← BACK");back.setOnClickListener(v->{if(web.canGoBack())web.goBack();else showHome();});bar.addView(back,new LinearLayout.LayoutParams(130,54));bar.addView(t("YouTube",17),new LinearLayout.LayoutParams(0,54,1));r.addView(bar);r.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(r);web.loadUrl(url);}
+ private void showSignIn(){LinearLayout r=page();TextView h=t("Sign in to TRK YouTube TV",30);h.setTypeface(null,1);r.addView(h);r.addView(t("Sign in with your phone",22));r.addView(t("Scan the QR code with your phone. Google account authorization uses Google's TV/device flow; TRK never asks for your Google password.",17));ImageView qr=new ImageView(this);qr.setImageBitmap(qr("https://www.youtube.com/activate",300));r.addView(qr,new LinearLayout.LayoutParams(320,320));r.addView(t("youtube.com/activate",20));r.addView(t("ACCOUNT CONNECTION STATUS: OAuth TV client ID not configured yet. Guest mode and browser sign-in remain available in this build.",16));Button open=b("OPEN YOUTUBE SIGN-IN");open.setOnClickListener(v->openWeb("https://www.youtube.com/activate"));r.addView(open,new LinearLayout.LayoutParams(-1,64));Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());r.addView(guest,new LinearLayout.LayoutParams(-1,64));Button back=b("← BACK");back.setOnClickListener(v->showWelcome());r.addView(back,new LinearLayout.LayoutParams(-1,64));open.requestFocus();}
+ private Bitmap qr(String data,int size){try{BitMatrix m=new MultiFormatWriter().encode(data,BarcodeFormat.QR_CODE,size,size);Bitmap bm=Bitmap.createBitmap(size,size,Bitmap.Config.RGB_565);for(int y=0;y<size;y++)for(int x=0;x<size;x++)bm.setPixel(x,y,m.get(x,y)?Color.BLACK:Color.WHITE);return bm;}catch(Exception e){return Bitmap.createBitmap(1,1,Bitmap.Config.RGB_565);}}
+ private LinearLayout page(){ScrollView s=new ScrollView(this);LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);r.setPadding(70,35,70,35);r.setBackgroundColor(Color.rgb(12,12,12));s.addView(r);setContentView(s);return r;}
+ private void showAccount(){LinearLayout r=page();r.addView(t("Account",30));r.addView(t(prefs.getBoolean("guest",false)?"Currently watching as Guest":"No account connected",18));Button sign=b("SIGN IN WITH PHONE / QR");sign.setOnClickListener(v->showSignIn());r.addView(sign,new LinearLayout.LayoutParams(-1,64));Button yt=b("YOUTUBE ACCOUNT IN BROWSER");yt.setOnClickListener(v->openWeb("https://www.youtube.com/account"));r.addView(yt,new LinearLayout.LayoutParams(-1,64));Button back=b("← HOME");back.setOnClickListener(v->showHome());r.addView(back,new LinearLayout.LayoutParams(-1,64));sign.requestFocus();}
+ private void showLocal(){LinearLayout r=page();r.addView(t("TRK Favorites",30));r.addView(t("Favorites from v0.2 are preserved. Direct video-ID favorites will be expanded into thumbnail cards in a later build.",17));Button back=b("← HOME");back.setOnClickListener(v->showHome());r.addView(back,new LinearLayout.LayoutParams(-1,64));back.requestFocus();}
+ private void showSettings(){LinearLayout r=page();r.addView(t("Settings",30));r.addView(t("TRK YouTube TV v"+VERSION+"\nAndroid "+Build.VERSION.RELEASE+" / API "+Build.VERSION.SDK_INT+"\nModel: "+Build.MANUFACTURER+" "+Build.MODEL+"\nMinimum Android: 4.4 / API 19",17));Button cookies=b("CLEAR YOUTUBE COOKIES");cookies.setOnClickListener(v->{CookieManager.getInstance().removeAllCookie();CookieManager.getInstance().removeSessionCookie();Toast.makeText(this,"Cookies cleared",0).show();});r.addView(cookies,new LinearLayout.LayoutParams(-1,64));Button welcome=b("PROFILE / START SCREEN");welcome.setOnClickListener(v->showWelcome());r.addView(welcome,new LinearLayout.LayoutParams(-1,64));Button back=b("← HOME");back.setOnClickListener(v->showHome());r.addView(back,new LinearLayout.LayoutParams(-1,64));cookies.requestFocus();}
+ private void destroyWeb(){if(web!=null){try{web.stopLoading();web.destroy();}catch(Throwable e){}web=null;}}
+ @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else showHome();}
+ @Override protected void onDestroy(){destroyWeb();super.onDestroy();}
 }
