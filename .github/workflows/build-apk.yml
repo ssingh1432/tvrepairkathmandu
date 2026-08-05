@@ -20,17 +20,29 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Patch YouTube WebView app identity
+      - name: Patch v0.5 user edition and proven player identity
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/main/java/com/tvrepairkathmandu/trkyoutube/MainActivity.java')
           s = p.read_text()
+          s = s.replace('private static final String VERSION="0.4.0";', 'private static final String VERSION="0.5.0";')
+          s = s.replace('immersive();\n        showWelcome();', 'immersive();\n        if(prefs.getBoolean("remember_guest",false) && apiKey().length()>0) showHome(); else showWelcome();')
+          s = s.replace('Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->showHome());', 'Button guest=b("WATCH AS GUEST");guest.setOnClickListener(v->{prefs.edit().putBoolean("remember_guest",true).apply();showHome();});')
+          s = s.replace('        Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());root.addView(setup,new LinearLayout.LayoutParams(dp(420),dp(62)));\n', '')
+          s = s.replace('        Button browser=b("WEB FALLBACK");browser.setOnClickListener(v->openWeb("https://www.youtube.com/"));root.addView(browser,new LinearLayout.LayoutParams(dp(420),dp(62)));\n', '')
+          s = s.replace('TextView h=t("Connect YouTube Data",22);', 'TextView h=t("YouTube service setup required",22);')
+          s = s.replace('box.addView(t("Native Home and Search need a YouTube Data API key. Add it once in YouTube Setup. The key stays on this device.",16));', 'box.addView(t("This device has not been configured yet. Open Technician Setup in Settings to connect native Home and Search.",16));')
+          s = s.replace('Button setup=b("OPEN YOUTUBE SETUP");', 'Button setup=b("OPEN TECHNICIAN SETUP");')
+          s = s.replace('Button web=b("WEB FALLBACK");web.setOnClickListener(v->openWeb("https://www.youtube.com/"));target.addView(web,new LinearLayout.LayoutParams(-1,dp(58)));', '')
+          s = s.replace('Button setup=b("YOUTUBE SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));', 'Button setup=b("TECHNICIAN SETUP");setup.setOnClickListener(v->showSetup());r.addView(setup,new LinearLayout.LayoutParams(-1,dp(60)));')
+          s = s.replace('TextView h=t("YouTube Setup",30);', 'TextView h=t("Technician Setup",30);')
+          s = s.replace('r.addView(t("For native Home/Search, paste a YouTube Data API v3 key. For real Google TV sign-in later, paste a TV/Limited Input OAuth client ID. These values are stored only in this app\'s private settings on the device.",16));', 'r.addView(t("Developer settings for YouTube Data API, region and future TV sign-in. Normal viewers should not need this screen after setup.",16));')
           s = s.replace("<head><meta name='viewport'", "<head><meta name='referrer' content='strict-origin-when-cross-origin'><meta name='viewport'")
           s = s.replace("origin=https%3A%2F%2Fwww.youtube.com'", "origin=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube&widget_referrer=https%3A%2F%2Fcom.tvrepairkathmandu.trkyoutube'")
           s = s.replace('web.loadDataWithBaseURL("https://www.youtube.com/",html', 'web.loadDataWithBaseURL("https://com.tvrepairkathmandu.trkyoutube/",html')
           p.write_text(s)
-          print('Patched player app identity/referrer')
+          print('Patched v0.5 user flow and preserved working player identity')
           PY
       - name: Build debug APK
         run: gradle --no-daemon clean assembleDebug
@@ -42,6 +54,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRK_YouTube_TV_v0.4.1_PLAYER_IDENTITY_FIX_APK
+          name: TRK_YouTube_TV_v0.5.0_USER_EDITION_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
