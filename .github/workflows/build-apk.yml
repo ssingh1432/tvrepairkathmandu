@@ -30,6 +30,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TRK_YouTube_TV_v0.3_APK
+          name: TRK_YouTube_TV_v0.3.1_UI_FIX_APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
